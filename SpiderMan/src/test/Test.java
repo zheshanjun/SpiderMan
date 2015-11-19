@@ -1,6 +1,8 @@
 package test;
 
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
 import org.openqa.selenium.By;
@@ -69,7 +71,25 @@ public class Test {
 	
 	public static void main(String[] args) throws Exception
 	{	
-		new Test();
+		int delay=5;
+		long lastUpdateTs=System.currentTimeMillis();
 		
+		for(int i=0;i<15;i++)
+		{
+			if(delay>0)
+			{
+				long curTs=System.currentTimeMillis();
+				long costMillis=curTs-lastUpdateTs; //本次更新消耗时间
+				System.out.println(costMillis);
+				lastUpdateTs=curTs;
+				if(costMillis<(delay*1000))
+				{
+					System.out.println(new Date());
+					
+					TimeUnit.MILLISECONDS.sleep(delay*1000-costMillis);
+//					Thread.sleep();
+				}
+			}
+		}
 	}
 }

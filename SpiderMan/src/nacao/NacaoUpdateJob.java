@@ -2,6 +2,10 @@ package nacao;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
+
+import tools.ConnectNetWork;
 import tools.JobConfig;
 import tools.Logger;
 import tools.MSSQLClient;
@@ -10,23 +14,26 @@ import tools.SysConfig;
 public class NacaoUpdateJob {
 
 	public MSSQLClient dbClient;	
-//	public SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-	public String imageSavePath="D:\\SpiderMan\\ImageNacaoOrg\\";
 	public static String processID;
 	public int totalUpdateCnt=0;
+	public int totalUpdateBatchCnt=0;
+	
 	public String today;
-	public String localhost;
+	public String host; //当前任务的IP
 	public Searcher searcher;
 	public String dstTableName;
 	
 	public int batchSize=100;
 	public int resetFlag=0;
-	public int startBaseCode=79300;
-	public boolean useProxy=false;
+	public int startBaseCode=82400;
+	public String changeIP="null";
+	public int delay=-1;
 	public Logger logger;
 	
 	public long lastUpdateTs=System.currentTimeMillis();
 
+	Date stopTime=SysConfig.sdf.parse(SysConfig.sdf.format(new Date()).substring(0,10)+" 17:30:00");
+	
 	public NacaoUpdateJob() throws Exception
 	{
 		dbClient=new MSSQLClient(
@@ -39,9 +46,9 @@ public class NacaoUpdateJob {
 		logger=new Logger(processID.replace(":","#"));
 	}
 	
-	public void setLocalhost(String ip)
+	public void setHost(String ip)
 	{
-		this.localhost=ip;
+		this.host=ip;
 	}
 	
 	public void initSearcher() throws Exception
@@ -58,7 +65,7 @@ public class NacaoUpdateJob {
 //			searcher.addProxyFactory();
 		}
 		
-		if(useProxy==true)
+		if(changeIP.equals("proxy"))
 		{
 			searcher.addProxyFactory();
 		}
@@ -79,14 +86,13 @@ public class NacaoUpdateJob {
 		ResultSet res0 = dbClient.execute(sql0);
 		res0.next();
 		processID=res0.getString(1);
-		String sql1=String.format("insert into ProcessStatus(processID) values('%s')", processID);
+		String sql1=String.format("insert into ProcessStatus(processID,host) values('%s','%s')", processID,host);
 		dbClient.execute(sql1);
 		dbClient.commit();
 	}
 	
 	public void run() throws Exception
 	{
-		
 		while(startBaseCode<99999999)
 		{
 			//5分钟没有更新过的进程，认为进程已死亡
@@ -102,14 +108,22 @@ public class NacaoUpdateJob {
 					+"where lastUpdateBaseCode= "
 					+"(select min(lastUpdateBaseCode) from ProcessStatus where lastUpdateStatus='1')";
 			ResultSet res1= dbClient.execute(sql1);
-			//如果有更新失败的进程，则从此进程的失败处开始更新
+			//如果有更新失败的进程，则从此进程的失败处开始更新，并将失败进程状态设为9（过期）
 			if(res1.next()==true && res1.getObject(1)!=null)
 			{
-				int lastUpdateBaseCode=Integer.valueOf(res1.getString(1));
-				String failedProcessID=res1.getString(2);
-				String sql4=String.format("update ProcessStatus set lastUpdateStatus='9' where processID='%s'",failedProcessID);
+				String lastUpdateBaseCode=res1.getString(1);
+//				String failedProcessID=res1.getString(2);
+				String sql4=String.format("update ProcessStatus set lastUpdateStatus='9' where lastUpdateBaseCode='%s'",lastUpdateBaseCode);
 				dbClient.execute(sql4);
-				startBaseCode=lastUpdateBaseCode;
+				startBaseCode=Integer.valueOf(lastUpdateBaseCode);
+				
+				//表明此进程已成功更新完一个批次，跳出本次循环，重新获取batchSize。
+				if(startBaseCode%batchSize==0)
+				{
+					dbClient.commit();
+//					System.out.println("startBaseCode:"+startBaseCode);
+					continue;
+				}
 			}
 			//否则从正在更新中的下一个batchSize整数倍点开始更新
 			else
@@ -130,6 +144,27 @@ public class NacaoUpdateJob {
 			dbClient.execute(sql3);
 			dbClient.commit();
 			updateBatch(startBaseCode);
+
+			if(new Date().after(stopTime))
+			{
+				searcher.quit();
+				logger.info("Time is up,job completed!");
+				logger.close();
+				System.exit(0);
+			}
+			
+			//如果设置adsl换ip,每更新5轮，重拨一次
+			if(changeIP.equals("ADSL") && (++totalUpdateBatchCnt)%5==0)
+			{
+				boolean reconnectRes=ConnectNetWork.reconnect();
+				if(reconnectRes==false)
+				{
+					searcher.quit();
+					logger.info("ADSL reconnected failed!");
+					logger.close();
+					System.exit(1);
+				}
+			}
 		}
 	}
 	
@@ -174,7 +209,7 @@ public class NacaoUpdateJob {
 				colsAndVals[1]+=",getDate()";
 				if(nacao.certificateExists==1 && dstTableName.equals("BaiduApp"))
 				{
-					String certificateSavePath=localhost+"@"+SysConfig.getCertificateSavePath(orgCode);
+					String certificateSavePath=host+"@"+SysConfig.getCertificateSavePath(orgCode);
 					colsAndVals[0]+=",certificateSavePath";
 					colsAndVals[1]+=",'"+certificateSavePath+"'";
 				}
@@ -195,14 +230,21 @@ public class NacaoUpdateJob {
 			dbClient.execute(sql);
 			dbClient.commit();
 			
-			//如果本次抓取时间不超过5秒，则休息一秒
-			long curTs=System.currentTimeMillis();
-			if(curTs-lastUpdateTs<5000)
+			//如果设置了延迟，且本次抓取时间不超过5秒，则休息一秒
+			
+			if(delay>0)
 			{
-//				logger.info("Too fast,have a sleep...");
-				Thread.sleep(1000);
+				long curTs=System.currentTimeMillis();
+				long costMillis=curTs-lastUpdateTs; //本次更新消耗时间
+//				System.out.println(costMillis);
+				lastUpdateTs=curTs;
+				if(costMillis<(delay*1000))
+				{
+//					logger.info("Too fast,have a sleep...");
+					TimeUnit.MILLISECONDS.sleep(delay*1000-costMillis);
+				}
 			}
-			lastUpdateTs=curTs;
+			
 
 			if(lastUpdateStatus==1)
 			{
@@ -222,9 +264,17 @@ public class NacaoUpdateJob {
 	public static void run(JobConfig jobConf) throws Exception
 	{
 		NacaoUpdateJob job = new NacaoUpdateJob();
-		job.useProxy=jobConf.getBoolean("useProxy");
+		if(jobConf.hasProperty("changeIP"))
+		{
+			job.changeIP=jobConf.getString("changeIP");
+		}
+		if(jobConf.hasProperty("delay"))
+		{
+			job.delay=jobConf.getInteger("delay");
+		}
+		
 		job.setDstTableName(jobConf.getString("dstTableName"));
-		job.setLocalhost(jobConf.getString("localhost"));
+		job.setHost(jobConf.getString("host"));
 		job.initSearcher();
 		job.run();
 	}
@@ -232,10 +282,10 @@ public class NacaoUpdateJob {
 	public static void main(String[] args) throws Exception
 	{
 		NacaoUpdateJob job = new NacaoUpdateJob();
-		job.useProxy=false;
-		job.setDstTableName("NacaoOrg");
-		job.setLocalhost("localhost");
-		job.initSearcher();
+//		job.setDstTableName("NacaoOrg");
+//		job.setHost("localhost");
+//		job.delay=5;
+//		job.initSearcher();
 		job.run();
 	}
 }

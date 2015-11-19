@@ -190,6 +190,7 @@ public class NacaoOrgSearcher extends Searcher{
 		//截图识别验证码
 		screenShot(); //截图
 		String validateCode=recongnizeValidateCode(); //识别		
+		System.out.println("validateCode:"+validateCode);
 		//识别完成后，删除验证码图片
 		new File(SysConfig.getValidateCodeSavePath(curOrgCode)).delete(); 
 		validateInput.sendKeys(validateCode);
@@ -290,13 +291,14 @@ public class NacaoOrgSearcher extends Searcher{
 		String validateCode=null;
 		
 		String cmd="cmd /c "+SysConfig.ZZJGDM_OCR+" "+SysConfig.getValidateCodeSavePath(curOrgCode);
-				
+//		System.out.println(cmd);
 		Process process = runtime.exec(cmd);
 		BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 		String line=null;
 		int i=0;
 		while((line=reader.readLine())!=null)
 		{
+//			System.out.println(line);
 			if((++i)==7)
 			{
 				validateCode=line;

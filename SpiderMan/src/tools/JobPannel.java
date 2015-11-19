@@ -25,6 +25,11 @@ public class JobPannel {
 				job.start();
 			}
 		}
+		else if(jobConf.jobName.equals("ConnectNetWork"))
+		{
+			ConnectNetWork.reconnect();
+		}
+		
 		else
 		{
 			System.out.println("Please input right jobName!");
