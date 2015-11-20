@@ -1,9 +1,8 @@
 package nacao;
 
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import com.microsoft.sqlserver.jdbc.SQLServerException;
 
 import tools.ConnectNetWork;
 import tools.JobConfig;
@@ -24,18 +23,15 @@ public class NacaoUpdateJob {
 	public String dstTableName;
 	
 	public int batchSize=100;
-	public int resetFlag=0;
 	public int startBaseCode=82400;
 	public String changeIP="null";
-	public int delay=-1;
 	public Logger logger;
 	
-	public long lastUpdateTs=System.currentTimeMillis();
-
-	Date stopTime=SysConfig.sdf.parse(SysConfig.sdf.format(new Date()).substring(0,10)+" 17:30:00");
+	Date stopTime=SysConfig.sdf.parse(SysConfig.sdf.format(new Date()).substring(0,10)+" 17:45:00");
 	
-	public NacaoUpdateJob() throws Exception
+	public NacaoUpdateJob(String ip) throws Exception
 	{
+		host=ip;
 		dbClient=new MSSQLClient(
 				String.format("jdbc:sqlserver://%s:1433;DatabaseName=%s",SysConfig.MSSQL_HOST,SysConfig.MSSQL_DB),
 				SysConfig.MSSQL_USER, //user
@@ -45,15 +41,9 @@ public class NacaoUpdateJob {
 		registerProcess();
 		logger=new Logger(processID.replace(":","#"));
 	}
-	
-	public void setHost(String ip)
-	{
-		this.host=ip;
-	}
-	
+
 	public void initSearcher() throws Exception
 	{
-		
 		if("BaiduApp".equals(dstTableName))
 		{
 			searcher=new BaiduAppSearcher();
@@ -64,11 +54,6 @@ public class NacaoUpdateJob {
 			searcher=new NacaoOrgSearcher();
 //			searcher.addProxyFactory();
 		}
-		
-		if(changeIP.equals("proxy"))
-		{
-			searcher.addProxyFactory();
-		}
 		searcher.setLogger(logger);
 		searcher.initDriver();
 	}
@@ -78,7 +63,7 @@ public class NacaoUpdateJob {
 		dstTableName=tableName;
 	}
 	
-	public void registerProcess() throws SQLException
+	public void registerProcess() throws Exception
 	{
 		String sql0=String.format("select convert(varchar(19),GETDATE(),120)+'_'+right('000'+cast(count(*) as varchar(3)),3) "
 				+"from ProcessStatus(tablockx) "
@@ -95,18 +80,20 @@ public class NacaoUpdateJob {
 	{
 		while(startBaseCode<99999999)
 		{
-			//5分钟没有更新过的进程，认为进程已死亡
+			//10分钟没有更新过的进程，认为进程已死亡
 			String sql0="update ProcessStatus "
 					+"set lastUpdateStatus=1,"
 					+ "lastUpdateBaseCode=case when lastUpdateStatus='0' then right('00000000'+cast(lastUpdateBaseCode+1 as varchar(8)),8) else lastUpdateBaseCode end "
 					+"where lastUpdateStatus in ('-1','0') "
-					+"and DATEDIFF(minute, lastUpdateTime,GETDATE())>5 ";
+					+"and DATEDIFF(minute, lastUpdateTime,GETDATE())>10 ";
 			dbClient.execute(sql0);
 			dbClient.commit();
 			
-			String sql1="select lastUpdateBaseCode,processID from ProcessStatus(tablockx) "
-					+"where lastUpdateBaseCode= "
-					+"(select min(lastUpdateBaseCode) from ProcessStatus where lastUpdateStatus='1')";
+//			String sql1="select lastUpdateBaseCode,processID from ProcessStatus(tablockx) "
+//					+"where lastUpdateBaseCode= "
+//					+"(select min(lastUpdateBaseCode) from ProcessStatus where lastUpdateStatus='1')";
+			
+			String sql1="select min(lastUpdateBaseCode) from ProcessStatus(tablockx) where lastUpdateStatus='1'";
 			ResultSet res1= dbClient.execute(sql1);
 			//如果有更新失败的进程，则从此进程的失败处开始更新，并将失败进程状态设为9（过期）
 			if(res1.next()==true && res1.getObject(1)!=null)
@@ -170,7 +157,6 @@ public class NacaoUpdateJob {
 	
 	public void updateBatch(int startBaseCode) throws Exception
 	{
-//		initSearcher();
 		logger.info("Current batch start base code:"+startBaseCode);
 		logger.info("Current process update numbers:"+totalUpdateCnt);
 		while(true)
@@ -179,46 +165,51 @@ public class NacaoUpdateJob {
 			int lastUpdateStatus=0;
 			try
 			{
-				if((resetFlag++)==batchSize)
+				totalUpdateCnt++;				
+				NACAO nacao=null;
+				for(int i=0;i<SysConfig.MAX_TRY_TIMES;i++)
 				{
-					searcher.reset();
-					resetFlag=0;
-				}
-
-				totalUpdateCnt++;
-				NACAO nacao=searcher.search(orgCode);
-				
-				//验证码错误，重新查询
-				while(nacao.updateStatus==5)
-				{
-					logger.info("Validate code recongnized failed,search again...");
 					nacao=searcher.search(orgCode);
-				}
-				//超时错误，重新查询
-				while(nacao.updateStatus>3 && nacao.updateStatus<4)
-				{
-					logger.info("Time out exception for status:"+nacao.updateStatus+",search again...");
-//					searcher.reset();
-//					resetFlag=0;
-//					logger.info("rebuild web driver succeed!");
-					nacao=searcher.search(orgCode);
+					if(nacao.updateStatus==0 || nacao.updateStatus==1)
+					{
+						break;
+					}
+					else if(nacao.updateStatus==3)
+					{
+						logger.info("Time out exception,searcher again...");
+						continue;
+					}
+					else if(nacao.updateStatus==2)
+					{
+						logger.info("Submit search request failed!");
+						continue;
+					}
+					else
+					{
+						logger.info("Search job failed.Check log for more information.");
+						throw new Exception("Search job failed.Check log for more information.");
+					}
 				}
 				
 				String[] colsAndVals=nacao.getColsAndVals();
-				colsAndVals[0]+=",lastUpdateTime";
-				colsAndVals[1]+=",getDate()";
-				if(nacao.certificateExists==1 && dstTableName.equals("BaiduApp"))
-				{
-					String certificateSavePath=host+"@"+SysConfig.getCertificateSavePath(orgCode);
-					colsAndVals[0]+=",certificateSavePath";
-					colsAndVals[1]+=",'"+certificateSavePath+"'";
-				}
+				colsAndVals[0]+=",lastUpdateTime,host";
+				colsAndVals[1]+=",getDate(),"+"'"+host+"'";
 
 				String insertSql=String.format("insert into %s(%s) values(%s)",dstTableName,colsAndVals[0],colsAndVals[1]);
 //				SysConfig.logInfo(insertSql);
 				dbClient.execute(insertSql);
 				logger.info("orgCode:"+orgCode+",updateStatus:"+nacao.updateStatus);
-			} catch (Exception e)
+			}
+			catch (SQLServerException e)
+			{
+				String message=e.getMessage();
+				if(message.startsWith("违反了 PRIMARY KEY 约束 "))
+				{
+					logger.info("Other process has token over this code.");
+					break;
+				}
+			}
+			catch (Exception e)
 			{
 				e.printStackTrace();
 				lastUpdateStatus=1;
@@ -229,59 +220,43 @@ public class NacaoUpdateJob {
 					+ "where processID='%s'",startBaseCode,lastUpdateStatus,totalUpdateCnt,startBaseCode,startBaseCode,processID);
 			dbClient.execute(sql);
 			dbClient.commit();
-			
-			//如果设置了延迟，且本次抓取时间不超过5秒，则休息一秒
-			
-			if(delay>0)
-			{
-				long curTs=System.currentTimeMillis();
-				long costMillis=curTs-lastUpdateTs; //本次更新消耗时间
-//				System.out.println(costMillis);
-				lastUpdateTs=curTs;
-				if(costMillis<(delay*1000))
-				{
-//					logger.info("Too fast,have a sleep...");
-					TimeUnit.MILLISECONDS.sleep(delay*1000-costMillis);
-				}
-			}
-			
 
 			if(lastUpdateStatus==1)
 			{
-				searcher.quit();
+				if(searcher.driverStatus!=-1)
+				{
+					searcher.quit();
+				}
 				logger.close();
 				System.exit(1);
 			}
 			else if((++startBaseCode)%batchSize==0)
 			{
-//				dbClient.commit();
-				break;	
+				searcher.quit();
+				searcher.initDriver();
+				break;
 			}
 		}
-//		searcher.reset();
 	}
 	
 	public static void run(JobConfig jobConf) throws Exception
 	{
-		NacaoUpdateJob job = new NacaoUpdateJob();
+
+		NacaoUpdateJob job = new NacaoUpdateJob(jobConf.getString("host"));
 		if(jobConf.hasProperty("changeIP"))
 		{
 			job.changeIP=jobConf.getString("changeIP");
 		}
-		if(jobConf.hasProperty("delay"))
-		{
-			job.delay=jobConf.getInteger("delay");
-		}
-		
+
 		job.setDstTableName(jobConf.getString("dstTableName"));
-		job.setHost(jobConf.getString("host"));
+//		job.setHost(jobConf.getString("host"));
 		job.initSearcher();
 		job.run();
 	}
 
 	public static void main(String[] args) throws Exception
 	{
-		NacaoUpdateJob job = new NacaoUpdateJob();
+		NacaoUpdateJob job = new NacaoUpdateJob("localhost");
 //		job.setDstTableName("NacaoOrg");
 //		job.setHost("localhost");
 //		job.delay=5;

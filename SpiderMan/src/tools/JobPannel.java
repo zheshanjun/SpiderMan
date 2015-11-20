@@ -1,6 +1,8 @@
 package tools;
 
+import nacao.BaiduAppSearcher;
 import nacao.NacaoUpdateJob;
+import test.Test;
 
 
 public class JobPannel {
@@ -16,8 +18,8 @@ public class JobPannel {
 		else if(jobConf.jobName.equals("ParallelExecCmd"))
 		{
 			String cmd=jobConf.getString("cmd");
-//			cmd="java -jar D:/SpiderMan/SpiderMan_fat.jar --jobName=NacaoOrgUpdateJob --provCode=310";
-			cmd="java -jar G:/git/SpiderMan/SpiderMan/SpiderMan_fat.jar --jobName=NacaoOrgUpdateJob --provCode=310";			
+			cmd="D:/SpiderMan/SpiderMan.bat";
+//			cmd="java -jar G:/git/SpiderMan/SpiderMan/SpiderMan_fat.jar --jobName=NacaoOrgUpdateJob --provCode=310";			
 			int processNbr=Integer.valueOf(jobConf.getString("processNbr"));
 			for(int i=0;i<processNbr;i++)
 			{
@@ -29,7 +31,10 @@ public class JobPannel {
 		{
 			ConnectNetWork.reconnect();
 		}
-		
+		else if(jobConf.jobName.equals("test"))
+		{
+			BaiduAppSearcher.test(jobConf);
+		}
 		else
 		{
 			System.out.println("Please input right jobName!");

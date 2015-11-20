@@ -18,18 +18,19 @@ import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxProfile;
 import org.openqa.selenium.remote.Augmenter;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import tools.JobConfig;
 import tools.Logger;
 import tools.ProxyFactory3;
 import tools.SysConfig;
 
-public class BaiduAppSearcher extends Searcher{
+public class BaiduAppSearcherChrome extends Searcher{
 
 	String searchPage="http://www.baidu.com/baidu?wd=%D7%E9%D6%AF%BB%FA%B9%B9%B4%FA%C2%EB&tn=monline_4_dg";
 	String searchWindowHandle;
@@ -44,6 +45,7 @@ public class BaiduAppSearcher extends Searcher{
 	By validateImageXpath=By.xpath(".//*[@id='validateCodeImage_1']");
 	By orgCodeSubmitXpath=By.xpath(".//*[@id='con_one_1']/div[1]/ul/li[2]/input[2]");	
 	By validateCodeBreakResXpath=By.xpath(".//div[@class='content']/div[@class]");
+//	By validateCodeBreakResXpath=By.xpath(".//div[@class='top_2']/div[@class='content']/div[@class]");
 
 	WebElement BAPPIframe=null;
 	WebElement orgCodeInput=null;
@@ -51,39 +53,38 @@ public class BaiduAppSearcher extends Searcher{
 	WebElement validateImage=null;
 	WebElement orgCodeSubmit=null;
 	WebElement searchAgain=null;
-	FirefoxProfile profile = new FirefoxProfile(); 
 	
 	String curOrgCode;
 	Runtime runtime=Runtime.getRuntime();
 	int iframeX,iframeY;
 
-	public BaiduAppSearcher()
+	public BaiduAppSearcherChrome()
 	{
-		profile.setPreference("startup.homepage_welcome_url.additional",searchPage);
+		System.setProperty("webdriver.chrome.driver", 
+				SysConfig.workDir+"\\chromedriver.exe"); 
 	}
 
 	public int initDriver() throws Exception
 	{
 		if(driver!=null) driver.close();
 		logger.info("Initializing web driver...");
-		driver=new FirefoxDriver(profile);
+
+//		FirefoxProfile profile = new FirefoxProfile(); 
+//		profile.setPreference("startup.homepage_welcome_url.additional",searchPage);
+//		driver=new FirefoxDriver(profile);
+		ChromeOptions options=new ChromeOptions();
+		options.addArguments("excludeSwitches=ignore-certificate-errors");
+//		options.add_experimental_option("excludeSwitches", ["ignore-certificate-errors"])
+		driver=new ChromeDriver(options);
+		driver.get(searchPage);
 		driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
 		driver.manage().window().maximize();
 		logger.info("Loading search page...");
 		
 		try
 		{
-			WebElement appButton=waitForAppWindow();
-			appButton.click();
-		}
-		catch (TimeoutException e) 
-		{
-//			e.printStackTrace();
-//			logger.info("Load search page time out,web driver will be rebuilt");
-//			return initDriver();
-		}
-		try
-		{
+//			WebElement appButton=waitForAppWindow();
+//			appButton.click();
 			BAPPIframe = waitForBAPPIframe();
 			driver.switchTo().frame(BAPPIframe);		
 			waitForLoadingAppBlock();
@@ -95,23 +96,57 @@ public class BaiduAppSearcher extends Searcher{
 			
 			logger.info("Initialize web driver succeed!");
 			return 0;
+			
 		}
 		catch (TimeoutException e) 
 		{
 			e.printStackTrace();
-			logger.info("Load search page time out,web driver will be rebuilt");			
+			logger.info("Load search page time out,web driver will be rebuilt");
+			
 			return initDriver();
 		}
-		
 	}
 
+	public int reset() throws Exception
+	{
+		logger.info("Resetting web driver...");
+		try
+		{
+			String location = waitForTitleLocation().getAttribute("class");
+			if(location.equals("top2"))
+			{
+				searchAgain=waitForSearchAgain();
+				searchAgain.click();
+			}
+			waitForLoadingAppBlock();
+			logger.info("Reset web driver succeed!");
+			return 0;
+		}
+		catch (Exception e)
+		{
+			return initDriver();
+		}
+	}
+	
 	public NACAO search(String orgCode) throws IOException
 	{
 		curOrgCode=orgCode;
+		return search(orgCode,1);
+	}
+	public NACAO search(String orgCode,int t) throws IOException
+	{
 		NACAO nacao=null;
 		float updateStatus=-1;
 		WebElement searchResultEle=null;
-
+		
+		driver.switchTo().defaultContent();
+		driver.switchTo().frame(BAPPIframe);
+		if(t>SysConfig.MAX_TRY_TIMES)
+		{
+			updateStatus=5;
+			nacao=new NACAO(orgCode,updateStatus);
+			return nacao;
+		}
 		try
 		{
 			waitForLoadingAppBlock();
@@ -141,15 +176,18 @@ public class BaiduAppSearcher extends Searcher{
 			}
 			else break;
 		}
-//		System.out.println("validateCode:'"+validateCode+"'");
+		System.out.println("validateCode:'"+validateCode+"'");
 		validateCodeInput.sendKeys(validateCode);
 		orgCodeSubmit.click();
-//		System.out.println("click over!");
+		System.out.println("click over!");
+//		String searchResultType;
 		try
 		{
-			searchAgain=waitForSearchAgain();
+			driver.switchTo().defaultContent();
+			driver.switchTo().frame(BAPPIframe);
 			searchResultEle=waitForSearchResult();
-			
+//			searchResultType=waitForSearchResult().getAttribute("class");
+			searchAgain=waitForSearchAgain();
 		}
 		catch(TimeoutException e)
 		{
@@ -159,9 +197,9 @@ public class BaiduAppSearcher extends Searcher{
 			return nacao;
 		}
 //		System.out.println("waitForSearchResult over!");
-		String searchResultType=searchResultEle.getAttribute("class");
+//		String searchResultType=searchResultEle.getAttribute("class");
 		//查询结果为机构名称
-		if(searchResultType.equals("details_word"))
+		if(searchResultEle.getAttribute("class").equals("details_word"))
 		{
 			String orgName=driver.findElement(By.xpath(".//*[@id='dmzContent']/div[1]/p[2]/span")).getText();
 			
@@ -172,7 +210,7 @@ public class BaiduAppSearcher extends Searcher{
 			return nacao;
 		}
 		//查询结果为机构证书,保存证书截图
-		else if(searchResultType.equals("details_picture"))
+		else if(searchResultEle.getAttribute("class").equals("details_picture"))
 		{
 			WebElement certificate=driver.findElement(By.xpath(".//*[@id='dmzContent']/div[1]/p/img"));
 			screenShotForCertificate(certificate);
@@ -185,20 +223,20 @@ public class BaiduAppSearcher extends Searcher{
 		}
 		else
 		{
-			String errorInfo=searchResultEle.getText().trim();
+			String errorInfo=searchResultEle.getAttribute("class").trim();
 			searchAgain.click();
 			
 			//机构代码不存在
 			if(errorInfo.startsWith("您输入的信息，查询结果为 0 条"))
 			{
 				nacao=new NACAO(curOrgCode,1);
+				return nacao;
 			}
 			//验证码识别失败
 			else
 			{
-				nacao=new NACAO(curOrgCode,5);
+				return search(orgCode,t+1);	
 			}
-			return nacao;
 		}
 	}
 	
@@ -309,7 +347,6 @@ public class BaiduAppSearcher extends Searcher{
 				imgSize.getWidth(),
 				imgSize.getHeight());
 		ImageIO.write(croppedImage, "png", new File(SysConfig.getCertificateSavePath(curOrgCode)));
-		
 	}
 	
 	public void screenShotForValicateCode() throws IOException
@@ -327,61 +364,19 @@ public class BaiduAppSearcher extends Searcher{
 				imgSize.getWidth(),
 				imgSize.getHeight());
 		ImageIO.write(croppedImage, "png", new File(SysConfig.getValidateCodeSavePath(curOrgCode)));
-
-	}
-	
-	public static void test(JobConfig jobConfig) throws Exception
-	{
-		int startBaseCode=jobConfig.getInteger("startBaseCode");
-		BaiduAppSearcher searcher=new BaiduAppSearcher();
-		searcher.setLogger(new Logger("test_"+startBaseCode));
-		searcher.initDriver();
-		
-		while(true)
-		{
-			String orgCode=NACAO.generateCode(startBaseCode);
-			NACAO nacao=searcher.search(orgCode);
-			while(nacao.updateStatus!=0 && nacao.updateStatus!=1)
-			{
-				if(nacao.updateStatus==2)
-				{
-					searcher.logger.info("Web driver may be dead.");
-					searcher.initDriver();
-				}
-				else if(nacao.updateStatus>3 && nacao.updateStatus<4)
-				{
-					searcher.logger.info("Time out exception for status:"+nacao.updateStatus+",search again...");
-					searcher.initDriver();
-				}
-				else if(nacao.updateStatus==5)
-				{
-					searcher.logger.info("Validate code recongnized failed,search again...");
-				}
-				
-				nacao=searcher.search(orgCode);	
-			}
-			System.out.println(nacao);
-			startBaseCode++;
-		}
-		
-		
 	}
 	
 	public static void main(String[] args) throws Exception
 	{
-//		BaiduAppSearcher searcher=new BaiduAppSearcher();
-//		searcher.setLogger(new Logger("test"));
-//		searcher.initDriver();
-//		String[] codeArray={"000000019","000000010","802100433","596247871"};
-//		for(String code:codeArray)
-//		{
-//			System.out.println(searcher.search(code));
-//		}
-		
-		String[] arg=new String[]{"--startBaseCode=32000000"};
-		JobConfig jobConfig=new JobConfig(arg);
-		test(jobConfig);
-		
+		BaiduAppSearcherChrome searcher=new BaiduAppSearcherChrome();
+		searcher.setLogger(new Logger("test"));
+		searcher.initDriver();
+		String[] codeArray={"000000019","802100433","596247871"};
+		for(String code:codeArray)
+		{
+			System.out.println(searcher.search(code));
+		}
+
 	}
 
 }

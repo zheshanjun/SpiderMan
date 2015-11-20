@@ -22,19 +22,9 @@ public class SeleniumTest {
 	public static void main(String[] args) throws InterruptedException
 	{
 		WebDriver driver=new FirefoxDriver();
-		driver.get("www.taobao.com/");
-
-		WebElement ele1 = driver.findElement(By.xpath(".//input[@id='kw']"));
+		driver.get("www.baidu.com");
 		
-		WebElement ele2=driver.findElement(By.xpath(".//input[@id='su']"));
-		
-		
-		System.out.println("******");
-		Thread.sleep(15000);
-		System.out.println("******");
-		
-		ele1.sendKeys("∆Ê∑Âµ¿√º");
-		ele2.click();
+		driver=null;
 
 	}
 }

@@ -1,39 +1,44 @@
 package nacao;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.RasterFormatException;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Arrays;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
+import org.openqa.selenium.ElementNotVisibleException;
 import org.openqa.selenium.NoSuchWindowException;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.Point;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxProfile;
 import org.openqa.selenium.remote.Augmenter;
+import org.openqa.selenium.remote.UnreachableBrowserException;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import tools.MSSQLClient;
+
+import tools.Logger;
 import tools.SysConfig;
 
 public class NacaoOrgSearcher extends Searcher{
 
 	String searchPage="https://s.nacao.org.cn";
 	String searchWindowHandle;
-	
-//	WebDriver driver=null; 
-	
 	By validateIframeXpath=By.xpath(".//*[@id='ym-ml']/div/div/div/iframe");
 	WebElement orgCodeInput=null;
 	By orgCodeInputXpath=By.xpath(".//input[@name='tit0']");
@@ -55,232 +60,255 @@ public class NacaoOrgSearcher extends Searcher{
 	WebElement validateSubmit=null;
 	By validateSubmitXpath=By.xpath("html/body/div[1]/table/tbody/tr[3]/td[3]/input");
 	
-	public String[] curProxy;
+	WebElement ymWindow=null;
+	By ymWindowXpath=By.xpath("/html/body/div[1]/div[2][contains(@style,'display: none')]");
 	
+	FirefoxProfile profile = new FirefoxProfile();
+	
+	SimpleDateFormat sdf1=new SimpleDateFormat("yyyy-MM-dd");
+	SimpleDateFormat sdf2=new SimpleDateFormat("yyyy年M月d日");
+
+	public NacaoOrgSearcher()
+	{
+		profile.setPreference("startup.homepage_welcome_url.additional",searchPage);
+	}
 	
 	public int initDriver() throws Exception
 	{
-		if(driver!=null) driver.quit();
-		logger.info("Initializing web driver...");
-		FirefoxProfile profile = new FirefoxProfile(); 
-		
-		profile.setPreference("startup.homepage_welcome_url.additional",searchPage);
-		
-		if(proxyFactory!=null)
-		{
-			String[] proxy=proxyFactory.getProxy(curProxy);
-			curProxy=proxy;
-			logger.info("curProxy:"+Arrays.toString(curProxy));
-			
-			String proxyIP=proxy[0];
-			int proxyPort=Integer.valueOf(proxy[1]);
-
-			profile.setPreference("network.proxy.type",1);
-			profile.setPreference("network.proxy.http",proxyIP);
-	        profile.setPreference("network.proxy.http_port",proxyPort);
-	        profile.setPreference("network.proxy.ssl",proxyIP);
-	        profile.setPreference("network.proxy.ssl_port",proxyPort);
-		}
-		else
-		{
-			logger.info("proxyFactory is null.");
-		}
-		
 		try
 		{
+			logger.info("Initializing web driver...");
+			System.out.println(System.currentTimeMillis());
 			driver=new FirefoxDriver(profile);
-			driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-			driver.manage().window().maximize();
+			System.out.println(System.currentTimeMillis());
+//			driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+//			driver.manage().window().maximize();
 			searchWindowHandle=driver.getWindowHandle();
-			logger.info("Checking orgCode input...");
-			
-			waitForOrgCodeInput();
-			return 0;
 		}
-		catch(Exception e){
-			logger.info(e.toString());
-//			e.printStackTrace();
-			return initDriver();
+		catch (WebDriverException e)
+		{
+			logger.info(SysConfig.getError(e));
+			driverStatus=-1;
+			return 1;
 		}
+		return initDriver(1);
 	}
 	
+	public int initDriver(int t) throws Exception
+	{
+		if(t==SysConfig.MAX_TRY_TIMES)
+		{
+			return 1;
+		}
+		try
+		{
+			logger.info("Checking orgCode input...");
+			orgCodeInput=waitForOrgCodeInput();
+			orgCodeSubmit=waitForOrgCodeSubmit();
+			return 0;
+		}
+		catch (TimeoutException e){
+			logger.info(SysConfig.getError(e));
+			driver.navigate().refresh();
+		}
+		catch (WebDriverException e)
+		{
+			logger.info(SysConfig.getError(e));
+			driverStatus=-1;
+			return 1;
+		}
+		return initDriver(t+1);
+	}
 
-	
 	public NACAO search(String orgCode) throws Exception
 	{
 		curOrgCode=orgCode;
-		NACAO nacao=null;
-//		SysConfig.logInfo("step-1 start...");
-		//step-1：提交查询请求
-		int step1Status=submitOrgCode();
-		if(step1Status==1)
-		{
-			float updateStatus=2;
-			nacao=new NACAO(orgCode,updateStatus);
-			return nacao;
-		}
-		
-		//切换到查询结果窗口
-		switchToWindow();
-//		SysConfig.logInfo("step-2 start...");
-		//step-2：输入验证码
-		int step2Status=breakValidateCode();
-		if(step2Status==1)
-		{
-			float updateStatus=3.1f;
-			nacao=new NACAO(orgCode,updateStatus);
-			return nacao;
-		}
-		
-//		SysConfig.logInfo("step-3 start...");
-		//step-3：解析查询页面结果
-		nacao=parseSearchResult();
-		
-//		SysConfig.logInfo("closing window...");
-		//关闭当前查询结果窗口，并返回查询窗口
-		driver.close();
-//		SysConfig.logInfo("switching to search page...");
-		driver.switchTo().window(searchWindowHandle);
-		return nacao;
-	}
-
-	//step-1：提交查询请求
-	public int submitOrgCode() throws IOException
-	{
-		int res=0;
+		NACAO nacao= new NACAO(curOrgCode,0);
 		try
 		{
-//			System.out.println("输入代码");
+			//提交查询请求
 			orgCodeInput.clear();
+			logger.info("curOrgCode:"+curOrgCode);
 			orgCodeInput.sendKeys(curOrgCode);
 			orgCodeSubmit.click();
-//			System.out.println("提交完成");
-		}
-		catch (Exception e)
-		{
-			logger.info(e.toString());
-//			e.printStackTrace();
-			res=1;
-		}
-		return res;
-	}
-	
-	//step-2：输入验证码
-	public int breakValidateCode() throws IOException, InterruptedException
-	{
-		int res=0;
-		WebElement validateIframe=null;
-		try
-		{
-			validateIframe=waitForValidateIframe();
-		}
-		catch (Exception e)
-		{
-			logger.info(e.toString());
-//			e.printStackTrace();
-			res=1;
-			return res;
-		}
-		Point iframeLocation = validateIframe.getLocation();
-		iframeX=iframeLocation.getX();
-		iframeY=iframeLocation.getY();
-		driver.switchTo().frame(validateIframe);		
-		waitForValidateInput();
-
-		//截图识别验证码
-		screenShot(); //截图
-		String validateCode=recongnizeValidateCode(); //识别		
-		System.out.println("validateCode:"+validateCode);
-		//识别完成后，删除验证码图片
-		new File(SysConfig.getValidateCodeSavePath(curOrgCode)).delete(); 
-		validateInput.sendKeys(validateCode);
-		validateSubmit.click();
-		
-		return res;
-	}
-	
-	//step-3：解析查询页面结果
-	public NACAO parseSearchResult() throws Exception
-	{
-		driver.switchTo().defaultContent();
-		String orgName=null; //机构名称
-		String orgType=null; //机构类型
-		String validPeriod=null; //有效期
-		String issuingAuthority=null; //颁发单位
-		String registeredCode=null; //机构登记证号
-		String registeredAddress=null; //地址
-		int certificateExists=0;
-		float updateStatus=0;
-		NACAO nacao=null;
-		WebElement loadResult=null;
-		try
-		{			
-			loadResult=waitForLoadResult();
-		}
-		catch (TimeoutException e1)
-		{
-			e1.printStackTrace();
-			updateStatus=3.2f;
-			nacao=new NACAO(curOrgCode,updateStatus);
-			return nacao;
-		}
-		if("检索结果0条".equals(loadResult.getText().trim()))
-		{
-			updateStatus=1;
-			nacao=new NACAO(curOrgCode,updateStatus);
-		}
-		
-		else
-		{
-			//机构名称
-			WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
-			orgName=nameEle.getText();
-			//编号
-			WebElement registerNbrEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[3]"));
-			registeredCode=registerNbrEle.getText();
-			//证书
-			WebElement certificateEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[4]"));
-			if(!"*".equals(certificateEle.getText()))
+			//跳转页面
+			
+			if(switchToSearchResultWindow()==false)
 			{
-				certificateExists=1;
+				nacao.setUpdateStatus(2); //提交查询请求异常
+				
+				if(driver.getWindowHandles().size()>1)
+				{
+					driver.quit();
+					initDriver();
+				}
+				return nacao;
+			}
+
+			//破解验证码
+			WebElement validateIframe=waitForValidateIframe();
+			Point iframeLocation = validateIframe.getLocation();
+			iframeX=iframeLocation.getX();
+			iframeY=iframeLocation.getY();
+			driver.switchTo().frame(validateIframe);
+			validateInput=waitForValidateInput();
+			validateSubmit=waitForValidateSubmit();
+			
+			for(int i=0;i<SysConfig.MAX_TRY_TIMES;i++)
+			{
+				screenShot(); //截图
+				String validateCode=recongnizeValidateCode();
+				new File(SysConfig.getValidateCodeSavePath(curOrgCode)).delete();
 				try
 				{
+					validateInput.sendKeys(validateCode);
+					validateSubmit.click();	
+				}
+				catch (ElementNotVisibleException e)
+				{
+					driver.switchTo().defaultContent();
+					break;
+				}
+				try
+				{
+					driver.switchTo().defaultContent();
+					if(waitForYmWindow())
+					{
+						break;
+					}
+				}
+				catch (TimeoutException e)
+				{
+					driver.switchTo().frame(validateIframe);
+					validateInput.clear();
+				}
+				
+			}
+			WebElement loadResult=waitForLoadResult();
+			if("检索结果0条".equals(loadResult.getText().trim()))
+			{
+				nacao.setUpdateStatus(1);
+			}
+			else
+			{
+				//机构名称
+				WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
+				nacao.setOrgName(nameEle.getText().trim());
+				//编号
+				WebElement registerNbrEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[3]"));
+				nacao.setRegisteredCode(registerNbrEle.getText().trim());
+				//证书
+				WebElement certificateEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[4]"));
+				if(!"*".equals(certificateEle.getText()))
+				{
+					nacao.setCertificateExists(1);
 					WebElement imageEle = certificateEle.findElement(By.xpath("/html/body/form/div/table/tbody/tr[2]/td/span/table/tbody/tr/td[4]/a/img"));
 					imageEle.click();
 					certificateIframe=waitForCertificateIframe();
 					String imageSrc = certificateIframe.getAttribute("src");
 					
-					driver.get(imageSrc);
-					By orgTypeXpath = By.xpath(".//*[@id='jglx']");
-					By registeredAddressXpath = By.xpath(".//*[@id='jgdz']");
-					By validPeriodXpath = By.xpath(".//*[@id='bzrq_zfrq']");
-					By issuingAuthorityXpath = By.xpath(".//*[@id='bzjgmc']");
+					imageSrc=URLDecoder.decode(imageSrc,"utf8");
+					imageSrc=URLDecoder.decode(imageSrc,"utf8");
+					URL url=new URL(imageSrc);
 					
-					WebElement orgTypeEle = driver.findElement(orgTypeXpath);
-					orgType=orgTypeEle.getText().trim();
-					WebElement registeredAddressEle = driver.findElement(registeredAddressXpath);
-					registeredAddress=registeredAddressEle.getText().trim();
-					WebElement validPeriodEle = driver.findElement(validPeriodXpath);
-					validPeriod=validPeriodEle.getText().trim();
-					WebElement issuingAuthorityEle = driver.findElement(issuingAuthorityXpath);
-					issuingAuthority=issuingAuthorityEle.getText().trim();
+					String startDate=null,stopDate=null;
+					String query=url.getQuery();
+					
+					String[] parameterArr=query.split("&");
+					for(String parameter:parameterArr)
+					{
+						String[] info=parameter.split("=",-1);
+						if("jgdz".equals(info[0]) && !"null".equals(info[1]))
+						{
+							nacao.setRegisteredAddress(info[1].trim());
+						}
+						else if("bzjgmc".equals(info[0]) && !"null".equals(info[1]))
+						{
+							nacao.setIssuingAuthority(info[1].trim());
+						}
+						else if("jglx".equals(info[0]) && !"null".equals(info[1]))
+						{
+							nacao.setOrgType(info[1].trim());
+						}
+						else if("bzrq".equals(info[0]) && !"null".equals(info[1]))
+						{
+							try
+							{
+								startDate=sdf2.format(sdf1.parse(info[1].trim()));
+							}
+							catch(ParseException e)
+							{
+								logger.info(SysConfig.getError(e));
+							}
+						}
+						else if("zfrq".equals(info[0]) && !"null".equals(info[1]))
+						{
+							try
+							{
+								stopDate=sdf2.format(sdf1.parse(info[1].trim()));
+							}
+							catch(ParseException e)
+							{
+								logger.info(SysConfig.getError(e));
+							}
+							
+						}
+						else if("reservea".equals(info[0]) && !"null".equals(info[1]))
+						{
+							nacao.setReservea(info[1].trim());
+						}
+					}
+					
+					if(startDate!=null && stopDate!=null)
+					{
+						nacao.setValidPeriod("自"+startDate+"至"+stopDate);
+					}
 				}
-				catch (Exception e)
-				{
-					logger.info(e.toString());
-					e.printStackTrace();
-					updateStatus=3;
-				}
-				
 			}
-			nacao= new NACAO(curOrgCode,0);
-			nacao.setCertificateExists(certificateExists);
-			nacao.setOrgName(orgName);
-			nacao.setOrgType(orgType);
-			nacao.setValidPeriod(validPeriod);
-			nacao.setIssuingAuthority(issuingAuthority);
-			nacao.setRegisteredCode(registeredCode);
-			nacao.setRegisteredAddress(registeredAddress);
+			driver.close();
+			switchToSearchPage();
+//			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (UnreachableBrowserException e) //浏览器崩溃
+		{
+			logger.info(SysConfig.getError(e));
+			driverStatus=-1;
+			nacao.setUpdateStatus(6);
+		}
+		catch (TimeoutException e) //超时
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(3);
+			logger.info("Closing driver...");
+			driver.close();
+			logger.info("switchTo searchWindowHandle...");
+			switchToSearchPage();
+//			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (StaleElementReferenceException e)
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(3);
+			logger.info("Closing driver...");
+			driver.close();
+			logger.info("switchTo searchWindowHandle...");
+			switchToSearchPage();
+//			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (RasterFormatException e)
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(3);
+			logger.info("Closing driver...");
+			driver.close();
+			logger.info("switchTo searchWindowHandle...");
+			switchToSearchPage();
+//			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (Exception e) //未知错误
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(7);
 		}
 		return nacao;
 	}
@@ -289,48 +317,71 @@ public class NacaoOrgSearcher extends Searcher{
 	public String recongnizeValidateCode() throws IOException
 	{
 		String validateCode=null;
-		
 		String cmd="cmd /c "+SysConfig.ZZJGDM_OCR+" "+SysConfig.getValidateCodeSavePath(curOrgCode);
-//		System.out.println(cmd);
-		Process process = runtime.exec(cmd);
-		BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-		String line=null;
-		int i=0;
-		while((line=reader.readLine())!=null)
+		try
 		{
-//			System.out.println(line);
-			if((++i)==7)
+			Process process = runtime.exec(cmd);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+			String line=null;
+			int i=0;
+			while((line=reader.readLine())!=null)
 			{
-				validateCode=line;
-				reader.close();
-				break;
+				if((++i)==7)
+				{
+					validateCode=line;
+					reader.close();
+					break;
+				}
 			}
+		}
+		catch (Exception e)
+		{
+			logger.info("Recongnize validate code failed.Try again...");
+			logger.info(SysConfig.getError(e));
 		}
 		return validateCode;
 	}
-
-	public boolean waitForOrgCodeInput()
+	
+	public WebElement waitForOrgCodeInput()
 	{
-		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<Boolean>() 
+		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<WebElement>() 
 		{
-        	public Boolean apply(WebDriver d) 
+        	public WebElement apply(WebDriver d) 
         	{
-        		orgCodeInput=d.findElement(orgCodeInputXpath);
-        		orgCodeSubmit=d.findElement(orgCodeSubmitXpath);
-        		return (orgCodeInput!=null && orgCodeSubmit!=null);
+        		return d.findElement(orgCodeInputXpath);
         	}
         });
 	}
 	
-	public boolean waitForValidateInput()
+	public WebElement waitForOrgCodeSubmit()
 	{
-		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<Boolean>() 
+		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<WebElement>() 
 		{
-        	public Boolean apply(WebDriver d) 
+        	public WebElement apply(WebDriver d) 
         	{
-        		validateInput = driver.findElement(validateInputXpath);
-        		validateSubmit = driver.findElement(validateSubmitXpath);
-        		return (validateInput!=null && validateInput!=null);
+        		return d.findElement(orgCodeSubmitXpath);
+        	}
+        });
+	}
+	
+	public WebElement waitForValidateInput()
+	{
+		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<WebElement>() 
+		{
+        	public WebElement apply(WebDriver d) 
+        	{
+        		return d.findElement(validateInputXpath);
+        	}        	       	
+        });
+	}
+	
+	public WebElement waitForValidateSubmit()
+	{
+		return (new WebDriverWait(driver,SysConfig.WAIT_IN_SECONDS,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<WebElement>() 
+		{
+        	public WebElement apply(WebDriver d) 
+        	{
+        		return d.findElement(validateSubmitXpath);
         	}        	       	
         });
 	}
@@ -363,46 +414,67 @@ public class NacaoOrgSearcher extends Searcher{
 		{
 			public WebElement apply(WebDriver d) 
         	{
-//				loadResultTd=
 				return d.findElement(loadResultTdXpath);
         	}        	       	
         });
 	}
 
-	public boolean switchToWindow(){  
+	public Boolean waitForYmWindow()
+	{
+		return (new WebDriverWait(driver,1,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<Boolean>() 
+		{
+			public Boolean apply(WebDriver d) 
+        	{
+				return d.findElement(ymWindowXpath)!=null;
+        	}        	       	
+        });
+	}
+	
+	public boolean switchToSearchPage() throws Exception
+	{
+		boolean flag=true;
+		try
+		{
+			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (NoSuchWindowException e)
+		{
+			driver.quit();
+			initDriver();
+		}
+		return flag;
+	}
+	
+	public boolean switchToSearchResultWindow() throws IOException{  
 	    boolean flag = false;  
 	    try {  
-	        String currentHandle = driver.getWindowHandle();  
+//	        String currentHandle = driver.getWindowHandle();  
 	        Set<String> handles = driver.getWindowHandles();  
 	        for (String s : handles) {  
-	            if (s.equals(currentHandle))  
+	            if (s.equals(searchWindowHandle))  
 	                continue;  
 	            else {  
 	                driver.switchTo().window(s);  
 	                flag = true;
-//                    System.out.println("Switch to window: successfully!");  
                     break;    
 	            }  
 	        }  
 	    } catch (NoSuchWindowException e) {  
-//	        System.out.println("Window: " + " could not found!");
-	        e.fillInStackTrace();  
+	    	logger.info(SysConfig.getError(e));
 	        flag = false;  
 	    }  
 	    return flag;  
 	}  
-	
+
 	//截图获取验证码
 	public void screenShot() throws IOException
 	{
 		WebElement validateImage = driver.findElement(By.xpath(".//img[@id='validateImage']"));
-//		System.out.println(validateImage.getAttribute("src"));
 		Point imgLocation = validateImage.getLocation();
 		Dimension imgSize = validateImage.getSize();
 		
 		WebDriver augmentedDriver = new Augmenter().augment(driver);
 		byte[] takeScreenshot = ((TakesScreenshot) augmentedDriver).getScreenshotAs(OutputType.BYTES);
-		
 		BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(takeScreenshot));
 		BufferedImage croppedImage = originalImage.getSubimage(
 				iframeX+imgLocation.getX(),
@@ -412,38 +484,28 @@ public class NacaoOrgSearcher extends Searcher{
 		ImageIO.write(croppedImage, "png", new File(SysConfig.getValidateCodeSavePath(curOrgCode)));
 	}
 
-	@Override
-	public int reset() throws Exception {
-		// TODO Auto-generated method stub
-		int res=0;
-		res=initDriver();
-		return res;
-		
-	}
-	
+
 	public static void main(String[] args) throws Exception
 	{
-		MSSQLClient dbClient = new MSSQLClient(
-				String.format("jdbc:sqlserver://%s:1433;DatabaseName=%s",SysConfig.MSSQL_HOST,SysConfig.MSSQL_DB),
-				SysConfig.MSSQL_USER, //user
-				SysConfig.MSSQL_PWD, //pwd
-				true //autoCommit
-				);
 		
 		NacaoOrgSearcher searcher= new NacaoOrgSearcher();
+		searcher.setLogger(new Logger("test"));
 		searcher.addProxyFactory();
 		searcher.initDriver();
-		String[] codeArray={"802100433","596247871","59502609X","808220081","67452250X","574064548","228560207",
-    			"669084461","500011128","579539434","576652132"};
-		for(String code:codeArray)
-		{
-			NACAO nacao=searcher.search(code);
-			String[] colsAndVals=nacao.getColsAndVals();
-			colsAndVals[0]+=",lastUpdateTime";
-			colsAndVals[1]+=",getDate()";
-			String insertSql=String.format("insert into %s(%s) values(%s)","NacaoOrg",colsAndVals[0],colsAndVals[1]);
-//			logger.info(insertSql);
-//			dbClient.execute(insertSql);
-		}
+		System.out.println(searcher.search("006622409"));
+		System.out.println(System.currentTimeMillis());
+//		System.out.println(searcher.search("802100433"));
+//		String[] codeArray={"802100433","596247871","59502609X","808220081","67452250X","574064548","228560207",
+//    			"669084461","500011128","579539434","576652132"};
+//		for(String code:codeArray)
+//		{
+//			NACAO nacao=searcher.search(code);
+//			String[] colsAndVals=nacao.getColsAndVals();
+//			colsAndVals[0]+=",lastUpdateTime";
+//			colsAndVals[1]+=",getDate()";
+//			String insertSql=String.format("insert into %s(%s) values(%s)","NacaoOrg",colsAndVals[0],colsAndVals[1]);
+////			logger.info(insertSql);
+////			dbClient.execute(insertSql);
+//		}
 	}
 }

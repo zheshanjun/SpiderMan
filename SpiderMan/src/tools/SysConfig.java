@@ -1,6 +1,8 @@
 package tools;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -41,6 +43,13 @@ public class SysConfig {
 	public static String getValidateCodeSavePath(String orgCode)
 	{
 		return VALIDATE_CODE_SAVE_PATH+"validateCode_"+orgCode+".png";
+	}
+	
+	public static String getError(Exception e)
+	{
+		StringWriter sw = new StringWriter();
+		e.printStackTrace(new PrintWriter(sw, true));
+		return sw.toString();
 	}
 	
 //	public static void logInfo(String info)

@@ -28,14 +28,6 @@ public class ParallelExecCmd implements Runnable{
 				Thread.yield();
 			}
 
-//			BufferedReader reader2 = new BufferedReader(new InputStreamReader(error));
-//			String line2 = null;
-//			while ((line2 = reader2.readLine()) != null) 
-//			{
-//				System.out.println(line2);
-//				Thread.yield();
-//			}
-			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

@@ -3,17 +3,18 @@ package nacao;
 import java.io.IOException;
 public class NACAO {
 
-	String orgCode; //组织机构代码
-	String orgName=null; //机构名称
-	String orgType=null; //机构类型
-	String validPeriod=null; //有效期
-	String issuingAuthority=null; //颁发单位
-	String registeredCode=null; //机构登记证号
-	String registeredAddress=null; //地址
-	int certificateExists=-1; //机构证书是否存在，存在：1，不存在：0
-	float updateStatus=-1;
+	public String orgCode; //组织机构代码
+	public String orgName=null; //机构名称
+	public String orgType=null; //机构类型
+	public String validPeriod=null; //有效期
+	public String issuingAuthority=null; //颁发单位
+	public String registeredCode=null; //机构登记证号
+	public String registeredAddress=null; //地址
+	public String reservea=null; //社会统一信用代码
+	public int certificateExists=-1; //机构证书是否存在，存在：1，不存在：0
+	public float updateStatus=-1;
 	/*
-	 * updateStatus->{0：正常，1：无此机构代码，2：提交查询请求异常，3.x：页面响应超时，4：机构证书解析失败，5：验证码验证失败}
+	 * updateStatus->{0：正常，1：无此机构代码，2：提交查询请求异常，3.x：页面响应超时，4：机构证书解析失败，5：验证码验证失败,6：浏览器崩溃,7：未知}
 	 * 
 	 * 3.1：验证码等待超时（官网）
 	 * 3.2：查询结果等待超时（官网）
@@ -28,6 +29,11 @@ public class NACAO {
 	public NACAO(String code,float updateStatus)
 	{
 		this.orgCode=code;
+		this.updateStatus=updateStatus;
+	}
+	
+	public void setUpdateStatus(float updateStatus)
+	{
 		this.updateStatus=updateStatus;
 	}
 	
@@ -59,7 +65,10 @@ public class NACAO {
 	{
 		this.certificateExists=certificateExists;
 	}
-	
+	public void setReservea(String reservea)
+	{
+		this.reservea=reservea;
+	}
 	public String toString()
 	{
 		return "orgCode:"+orgCode
@@ -113,6 +122,12 @@ public class NACAO {
 			cols.append("certificateExists,");
 			vals.append(certificateExists+",");
 		}
+		if(reservea!=null)
+		{
+			cols.append("reservea,");
+			vals.append("'"+reservea+"',");
+		}
+		
 		cols.append("updateStatus");
 		vals.append(updateStatus);
 		
@@ -153,6 +168,7 @@ public class NACAO {
 //		
 //		String vals=colsAndVals[1]+",getDate()";
 //		String insertSql=String.format("insert into %s(%s) values(%s)","BaiduApp",cols,vals);
-//		System.out.println(insertSql);
+		System.out.println(generateCode(830901));
+		
 	}
 }
