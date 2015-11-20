@@ -34,8 +34,9 @@ public class NacaoUpdateJob {
 
 	Date stopTime=SysConfig.sdf.parse(SysConfig.sdf.format(new Date()).substring(0,10)+" 17:30:00");
 	
-	public NacaoUpdateJob() throws Exception
+	public NacaoUpdateJob(String ip) throws Exception
 	{
+		host=ip;
 		dbClient=new MSSQLClient(
 				String.format("jdbc:sqlserver://%s:1433;DatabaseName=%s",SysConfig.MSSQL_HOST,SysConfig.MSSQL_DB),
 				SysConfig.MSSQL_USER, //user
@@ -46,10 +47,10 @@ public class NacaoUpdateJob {
 		logger=new Logger(processID.replace(":","#"));
 	}
 	
-	public void setHost(String ip)
-	{
-		this.host=ip;
-	}
+//	public void setHost(String ip)
+//	{
+//		this.host=ip;
+//	}
 	
 	public void initSearcher() throws Exception
 	{
@@ -263,7 +264,8 @@ public class NacaoUpdateJob {
 	
 	public static void run(JobConfig jobConf) throws Exception
 	{
-		NacaoUpdateJob job = new NacaoUpdateJob();
+
+		NacaoUpdateJob job = new NacaoUpdateJob(jobConf.getString("host"));
 		if(jobConf.hasProperty("changeIP"))
 		{
 			job.changeIP=jobConf.getString("changeIP");
@@ -274,14 +276,14 @@ public class NacaoUpdateJob {
 		}
 		
 		job.setDstTableName(jobConf.getString("dstTableName"));
-		job.setHost(jobConf.getString("host"));
+//		job.setHost(jobConf.getString("host"));
 		job.initSearcher();
 		job.run();
 	}
 
 	public static void main(String[] args) throws Exception
 	{
-		NacaoUpdateJob job = new NacaoUpdateJob();
+		NacaoUpdateJob job = new NacaoUpdateJob("localhost");
 //		job.setDstTableName("NacaoOrg");
 //		job.setHost("localhost");
 //		job.delay=5;
