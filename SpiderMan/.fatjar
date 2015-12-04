@@ -1,0 +1,14 @@
+#Fat Jar Configuration File
+#Wed Nov 18 00:00:33 CST 2015
+onejar.license.required=true
+manifest.classpath=
+manifest.removesigners=true
+onejar.checkbox=false
+jarname=SpiderMan_fat.jar
+manifest.mergeall=false
+manifest.mainclass=tools.JobPannel
+manifest.file=<createnew>
+jarname.isextern=false
+onejar.expand=
+excludes=
+includes=

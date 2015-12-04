@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/sqljdbc_3.0/chs/sqljdbc4.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/junit-4.10.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/selenium-java-2.48.2.jar" sourcepath="G:/EclipseProjects/jar/SpiderMan/selenium-java-2.48.2-srcs.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/selenium-server-2.48.2.jar" sourcepath="G:/EclipseProjects/jar/SpiderMan/selenium-server-2.48.2-srcs.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/xmlgraphics-commons-1.5.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/cdh4jars/lib/guava-11.0.2.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/commons-beanutils-1.9.1.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/commons-io-2.4.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/SpiderMan/selenium-server-standalone-2.48.2.jar"/>
+	<classpathentry kind="lib" path="G:/EclipseProjects/jar/jsoup/jsoup-1.8.1.jar" sourcepath="G:/EclipseProjects/jar/jsoup/jsoup-1.8.1-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:filG:/G:/EclipseProjects/jar/jsoup/jsoup-1.8.1-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

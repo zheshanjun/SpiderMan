@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Manifest-Class: tool.JobPannel
+Class-Path: 
+ G:/EclipseProjects/jar/sqljdbc_3.0/chs/sqljdbc4.jar 
+ G:/EclipseProjects/jar/SpiderMan/junit-4.10.jar
+ G:/EclipseProjects/jar/SpiderMan/selenium-java-2.48.2.jar
+ G:/EclipseProjects/jar/SpiderMan/selenium-server-2.48.2.jar
+ G:/EclipseProjects/jar/SpiderMan/xmlgraphics-commons-1.5.jar
+ G:/EclipseProjects/jar/cdh4jars/lib/guava-11.0.2.jar
+ G:/EclipseProjects/jar/SpiderMan/commons-beanutils-1.9.1.jar
+ G:/EclipseProjects/jar/SpiderMan/commons-io-2.4.jar
+ G:/EclipseProjects/jar/SpiderMan/selenium-server-standalone-2.48.2.jar
+ G:/EclipseProjects/jar/jsoup/jsoup-1.8.1.jar
