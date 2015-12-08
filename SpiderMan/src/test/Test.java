@@ -42,15 +42,15 @@ public class Test {
 	{
 		String page="https://www.taobao.com/";
 		
-		System.setProperty("webdriver.chrome.driver", 
-				SysConfig.workDir+"\\chromedriver.exe"); 
-		driver=new ChromeDriver();
-		System.out.println(driver.getWindowHandles());
-//		FirefoxProfile profile = new FirefoxProfile();
-//		profile.setPreference("startup.homepage_welcome_url.additional",page);
-//        driver=new FirefoxDriver(profile);
+//		System.setProperty("webdriver.chrome.driver", 
+//				SysConfig.workDir+"\\chromedriver.exe"); 
+//		driver=new ChromeDriver();
+//		System.out.println(driver.getWindowHandles());
+		FirefoxProfile profile = new FirefoxProfile();
+		profile.setPreference("startup.homepage_welcome_url.additional",page);
+        driver=new FirefoxDriver(profile);
 		
-		driver.get(page);
+//		driver.get(page);
 		System.out.println(driver.getWindowHandles());
         driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
 		driver.manage().window().maximize();
@@ -61,24 +61,31 @@ public class Test {
 	
 	public void clickMore()
 	{
-		WebElement input=waitForInput();
+//		WebElement input=waitForInput();
 		WebElement submit=waitForSubmit();
-		input.sendKeys("ÁúÈª½£");
+//		input.sendKeys("ÁúÈª½£");
 		submit.click();
-		
-		
-		for(int i=0;i<50 && driver.getWindowHandles().size()==1;i++)
+		System.out.println("driver.getWindowHandles():"+driver.getWindowHandles());
+		driver.close();
+		for(String handle:driver.getWindowHandles())
 		{
-			try {
-				Thread.sleep(100);
-				System.out.println(i);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			driver.switchTo().window(handle);
+			driver.close();
+			
 		}
-		
-		System.out.println(driver.getWindowHandles());
+		System.out.println("driver.getWindowHandles():"+driver.getWindowHandles());
+		driver.quit();
+//		for(int i=0;i<50 && driver.getWindowHandles().size()==1;i++)
+//		{
+//			try {
+//				Thread.sleep(100);
+//				System.out.println(i);
+//			} catch (InterruptedException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//		}
+//		System.out.println(driver.getWindowHandles());
 	}
 	
 	public WebElement waitForSubmit()
@@ -88,7 +95,8 @@ public class Test {
 		{
         	public WebElement apply(WebDriver d) 
         	{
-        		return d.findElement(By.xpath("html/body/div[2]/div[2]/div/div[1]/div/div/div/div[2]/div[2]/form/div[1]/button"));
+        		return d.findElement(By.xpath("/html/body/div[2]/div[2]/div/div[1]/div/div/div/div[3]/div[1]/div/a"));
+//        		return d.findElement(By.xpath("html/body/div[2]/div[2]/div/div[1]/div/div/div/div[2]/div[2]/form/div[1]/button"));
         	}
         });
 	}
@@ -148,26 +156,12 @@ public class Test {
 	
 	public static void main(String[] args) throws Exception
 	{	
-//		Test test=new Test();
-//		test.clickMore();
+		Test test=new Test();
+		test.clickMore();
 //		for(int i=0;i<5;i++)
 //		{
 //			test.clickMore();
 //			System.out.println("++++++++++++++"+i);
 //		}
-		
-		String url="https://s.nacao.org.cn/gaiwan_shehui.jsp?keyword=006622409&jgmc=%25E5%258F%258C%25E7%2589%258C%25E5%258E%25BF%25E5%25BB%25BA%25E8%25AE%25BE%25E5%25B7%25A5%25E7%25A8%258B%25E8%25B4%25A8%25E9%2587%258F%25E6%25A3%2580%25E6%25B5%258B%25E8%25AF%2595%25E9%25AA%258C%25E4%25B8%25AD%25E5%25BF%2583&jglx=null&jgdz=%25E5%258F%258C%25E7%2589%258C%25E5%258E%25BF%25E5%25B9%25B3%25E9%2598%25B3%25E8%25B7%25AF32%25E5%258F%25B7&bzrq=2005-04-27&zfrq=2055-04-26&bzjgmc=%25E6%25B9%2596%25E5%258D%2597%25E7%259C%2581%25E8%25B4%25A8%25E9%2587%258F%25E6%258A%2580%25E6%259C%25AF%25E7%259B%2591%25E7%259D%25A3%25E5%25B1%2580&reservea=91431123006622409U&zcrq=2005-04-27";
-//		url=URLDecoder.decode(url,"utf8");
-//		url=URLDecoder.decode(url,"utf8");
-//		
-//		URL u=new URL(url);
-//		System.out.println(u.getQuery());
-		
-		parseQuery(url);
-		
-		SimpleDateFormat sdf1=new SimpleDateFormat("yyyy-MM-dd");
-		SimpleDateFormat sdf2=new SimpleDateFormat("yyyyÄêMÔÂdÈÕ");
-		
-		System.out.println(sdf2.format(sdf1.parse("2015a-13-20")));
 	}
 }

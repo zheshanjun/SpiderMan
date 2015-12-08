@@ -31,7 +31,7 @@ public class SysConfig {
 
 	public static int MAX_TRY_TIMES=10;
 	public static int WAIT_IN_SECONDS=30;
-	public static int SLEEP_IN_MILLIS=250; //default value is 500
+	public static int SLEEP_IN_MILLIS=500; //default value is 500
 	
 	public static SimpleDateFormat sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	

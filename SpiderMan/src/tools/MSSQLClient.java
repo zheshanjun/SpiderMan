@@ -49,6 +49,11 @@ public class MSSQLClient{
         return res;
 	}
 	
+	public void close() throws SQLException
+	{
+		conn.close();
+	}
+	
 	public void commit() throws SQLException
 	{
 		conn.commit();

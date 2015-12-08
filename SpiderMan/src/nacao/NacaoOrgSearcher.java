@@ -22,6 +22,7 @@ import org.openqa.selenium.Point;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.UnhandledAlertException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
@@ -38,7 +39,7 @@ import tools.SysConfig;
 public class NacaoOrgSearcher extends Searcher{
 
 	String searchPage="https://s.nacao.org.cn";
-	String searchWindowHandle;
+	
 	By validateIframeXpath=By.xpath(".//*[@id='ym-ml']/div/div/div/iframe");
 	WebElement orgCodeInput=null;
 	By orgCodeInputXpath=By.xpath(".//input[@name='tit0']");
@@ -68,43 +69,40 @@ public class NacaoOrgSearcher extends Searcher{
 	SimpleDateFormat sdf1=new SimpleDateFormat("yyyy-MM-dd");
 	SimpleDateFormat sdf2=new SimpleDateFormat("yyyy年M月d日");
 
-	public NacaoOrgSearcher()
+	public NacaoOrgSearcher() throws IOException
 	{
 		profile.setPreference("startup.homepage_welcome_url.additional",searchPage);
 	}
 	
 	public int initDriver() throws Exception
 	{
-		try
-		{
-			logger.info("Initializing web driver...");
-			System.out.println(System.currentTimeMillis());
-			driver=new FirefoxDriver(profile);
-			System.out.println(System.currentTimeMillis());
-//			driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
-//			driver.manage().window().maximize();
-			searchWindowHandle=driver.getWindowHandle();
-		}
-		catch (WebDriverException e)
-		{
-			logger.info(SysConfig.getError(e));
-			driverStatus=-1;
-			return 1;
-		}
+		logger.info("Driver is initializing...");
 		return initDriver(1);
 	}
-	
 	public int initDriver(int t) throws Exception
 	{
 		if(t==SysConfig.MAX_TRY_TIMES)
 		{
-			return 1;
+			logger.info("Driver initializing failed!");
+			logger.close();
+			System.exit(1);
 		}
 		try
 		{
-			logger.info("Checking orgCode input...");
+			if(driverStatus!=0)
+			{
+				if(fireFoxPath!=null && !fireFoxPath.equals("default"))
+				{
+					System.setProperty("webdriver.firefox.bin",fireFoxPath);
+				}
+				driver=new FirefoxDriver(profile);
+				driverStatus=0;
+			}
+			searchWindowHandle=driver.getWindowHandle();
 			orgCodeInput=waitForOrgCodeInput();
 			orgCodeSubmit=waitForOrgCodeSubmit();
+			
+			logger.info("Driver initializing succeed!");
 			return 0;
 		}
 		catch (TimeoutException e){
@@ -114,8 +112,13 @@ public class NacaoOrgSearcher extends Searcher{
 		catch (WebDriverException e)
 		{
 			logger.info(SysConfig.getError(e));
-			driverStatus=-1;
-			return 1;
+			driverStatus=1;
+		}
+		catch (Exception e)
+		{
+			logger.info(SysConfig.getError(e));
+			driverStatus=1;
+//			return 1;
 		}
 		return initDriver(t+1);
 	}
@@ -128,7 +131,7 @@ public class NacaoOrgSearcher extends Searcher{
 		{
 			//提交查询请求
 			orgCodeInput.clear();
-			logger.info("curOrgCode:"+curOrgCode);
+//			logger.info("curOrgCode:"+curOrgCode);
 			orgCodeInput.sendKeys(curOrgCode);
 			orgCodeSubmit.click();
 			//跳转页面
@@ -136,12 +139,8 @@ public class NacaoOrgSearcher extends Searcher{
 			if(switchToSearchResultWindow()==false)
 			{
 				nacao.setUpdateStatus(2); //提交查询请求异常
-				
-				if(driver.getWindowHandles().size()>1)
-				{
-					driver.quit();
-					initDriver();
-				}
+				quitDriver();
+				initDriver();
 				return nacao;
 			}
 
@@ -191,6 +190,7 @@ public class NacaoOrgSearcher extends Searcher{
 			}
 			else
 			{
+				nacao.setCertificateExists(0);
 				//机构名称
 				WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
 				nacao.setOrgName(nameEle.getText().trim());
@@ -267,12 +267,11 @@ public class NacaoOrgSearcher extends Searcher{
 			}
 			driver.close();
 			switchToSearchPage();
-//			driver.switchTo().window(searchWindowHandle);
 		}
 		catch (UnreachableBrowserException e) //浏览器崩溃
 		{
 			logger.info(SysConfig.getError(e));
-			driverStatus=-1;
+			driverStatus=1;
 			nacao.setUpdateStatus(6);
 		}
 		catch (TimeoutException e) //超时
@@ -295,6 +294,13 @@ public class NacaoOrgSearcher extends Searcher{
 			switchToSearchPage();
 //			driver.switchTo().window(searchWindowHandle);
 		}
+		catch (UnhandledAlertException e)
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(2); //提交查询请求异常
+			quitDriver();
+			initDriver();
+		}
 		catch (RasterFormatException e)
 		{
 			logger.info(SysConfig.getError(e));
@@ -304,6 +310,14 @@ public class NacaoOrgSearcher extends Searcher{
 			logger.info("switchTo searchWindowHandle...");
 			switchToSearchPage();
 //			driver.switchTo().window(searchWindowHandle);
+		}
+		catch (WebDriverException e)
+		{
+			logger.info(SysConfig.getError(e));
+			nacao.setUpdateStatus(3); 
+			logger.info("WebDriverException,web driver will be rebuilt...");
+			quitDriver();
+			initDriver();
 		}
 		catch (Exception e) //未知错误
 		{
@@ -439,7 +453,7 @@ public class NacaoOrgSearcher extends Searcher{
 		}
 		catch (NoSuchWindowException e)
 		{
-			driver.quit();
+			quitDriver();
 			initDriver();
 		}
 		return flag;
@@ -490,7 +504,7 @@ public class NacaoOrgSearcher extends Searcher{
 		
 		NacaoOrgSearcher searcher= new NacaoOrgSearcher();
 		searcher.setLogger(new Logger("test"));
-		searcher.addProxyFactory();
+		searcher.setFireFoxPath("C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe");
 		searcher.initDriver();
 		System.out.println(searcher.search("006622409"));
 		System.out.println(System.currentTimeMillis());

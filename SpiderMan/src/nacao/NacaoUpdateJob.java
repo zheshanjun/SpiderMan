@@ -22,7 +22,7 @@ public class NacaoUpdateJob {
 	public Searcher searcher;
 	public String dstTableName;
 	
-	public int batchSize=100;
+	public int batchSize=50;
 	public int startBaseCode=82400;
 	public String changeIP="null";
 	public Logger logger;
@@ -42,7 +42,7 @@ public class NacaoUpdateJob {
 		logger=new Logger(processID.replace(":","#"));
 	}
 
-	public void initSearcher() throws Exception
+	public void initSearcher(String fireFoxPath) throws Exception
 	{
 		if("BaiduApp".equals(dstTableName))
 		{
@@ -51,10 +51,15 @@ public class NacaoUpdateJob {
 		}
 		else if("NacaoOrg".equals(dstTableName))
 		{
+			logger.info("dstTableName:"+dstTableName);
 			searcher=new NacaoOrgSearcher();
-//			searcher.addProxyFactory();
 		}
 		searcher.setLogger(logger);
+		if(!fireFoxPath.equals("default"))
+		{
+			logger.info("fireFoxPath:"+fireFoxPath);
+			searcher.setFireFoxPath(fireFoxPath);
+		}
 		searcher.initDriver();
 	}
 	
@@ -123,7 +128,7 @@ public class NacaoUpdateJob {
 					startBaseCode=lastUpdateBaseCode-(lastUpdateBaseCode%batchSize)+batchSize;
 				}
 			}
-//			dbClient.commit();
+
 			int lastUpdateStatus=-1;
 			String sql3=String.format("update ProcessStatus set lastUpdateBaseCode='%08d',lastUpdateStatus='%d',"
 					+ "totalUpdateCnt='%d',lastUpdateTime=getDate(),maxUpdateBaseCode=case when maxUpdateBaseCode>'%08d' then maxUpdateBaseCode else '%08d' end "
@@ -131,26 +136,18 @@ public class NacaoUpdateJob {
 			dbClient.execute(sql3);
 			dbClient.commit();
 			updateBatch(startBaseCode);
-
+			
+			//到停止时间后，修改进程状态，退出程序。
 			if(new Date().after(stopTime))
 			{
-				searcher.quit();
+				dbClient.execute(String.format("update ProcessStatus set lastUpdateStatus='9' where processID='%s'",processID));
+				dbClient.commit();
+				dbClient.close();
+				
+				searcher.quitDriver();
 				logger.info("Time is up,job completed!");
 				logger.close();
 				System.exit(0);
-			}
-			
-			//如果设置adsl换ip,每更新5轮，重拨一次
-			if(changeIP.equals("ADSL") && (++totalUpdateBatchCnt)%5==0)
-			{
-				boolean reconnectRes=ConnectNetWork.reconnect();
-				if(reconnectRes==false)
-				{
-					searcher.quit();
-					logger.info("ADSL reconnected failed!");
-					logger.close();
-					System.exit(1);
-				}
 			}
 		}
 	}
@@ -183,6 +180,11 @@ public class NacaoUpdateJob {
 					{
 						logger.info("Submit search request failed!");
 						continue;
+					}
+					else if(nacao.updateStatus==6)
+					{
+						logger.info("Web driver may be died!");
+						throw new Exception("Web driver may be died!");
 					}
 					else
 					{
@@ -223,16 +225,31 @@ public class NacaoUpdateJob {
 
 			if(lastUpdateStatus==1)
 			{
-				if(searcher.driverStatus!=-1)
+				if(searcher.driverStatus==0)
 				{
-					searcher.quit();
+					searcher.quitDriver();
 				}
 				logger.close();
 				System.exit(1);
 			}
 			else if((++startBaseCode)%batchSize==0)
 			{
-				searcher.quit();
+				searcher.quitDriver();
+				//如果设置adsl换ip,重拨一次
+				if(changeIP.equals("ADSL"))
+				{
+					logger.info("ADSL is reconnecting...");
+					if(ConnectNetWork.reconnect()==false)
+					{
+						logger.info("ADSL reconnecting failed!");
+						logger.close();
+						System.exit(1);
+					}
+					else
+					{
+						logger.info("ADSL reconnecting succeed!");
+					}
+				}
 				searcher.initDriver();
 				break;
 			}
@@ -241,16 +258,22 @@ public class NacaoUpdateJob {
 	
 	public static void run(JobConfig jobConf) throws Exception
 	{
-
+		
 		NacaoUpdateJob job = new NacaoUpdateJob(jobConf.getString("host"));
 		if(jobConf.hasProperty("changeIP"))
 		{
 			job.changeIP=jobConf.getString("changeIP");
 		}
-
 		job.setDstTableName(jobConf.getString("dstTableName"));
-//		job.setHost(jobConf.getString("host"));
-		job.initSearcher();
+		if(jobConf.hasProperty("fireFoxPath"))
+		{
+			job.initSearcher(jobConf.getString("fireFoxPath"));
+		}
+		else
+		{
+			job.initSearcher("default");
+		}
+		
 		job.run();
 	}
 
