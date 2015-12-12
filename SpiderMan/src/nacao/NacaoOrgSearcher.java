@@ -179,7 +179,15 @@ public class NacaoOrgSearcher extends Searcher{
 				catch (TimeoutException e)
 				{
 					driver.switchTo().frame(validateIframe);
-					validateInput.clear();
+					try
+					{
+						validateInput.clear();
+					}
+					catch (ElementNotVisibleException e2)
+					{
+						driver.switchTo().defaultContent();
+						break;
+					}
 				}
 				
 			}
@@ -192,20 +200,20 @@ public class NacaoOrgSearcher extends Searcher{
 			{
 				nacao.setCertificateExists(0);
 				//机构名称
-				WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
+//				WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
+				WebElement nameEle = loadResult.findElement(By.xpath("following-sibling::td[1]"));
 				nacao.setOrgName(nameEle.getText().trim());
 				//编号
-				WebElement registerNbrEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[3]"));
+//				WebElement registerNbrEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[3]"));
+				WebElement registerNbrEle = loadResult.findElement(By.xpath("following-sibling::td[2]"));
 				nacao.setRegisteredCode(registerNbrEle.getText().trim());
 				//证书
-				WebElement certificateEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[4]"));
+//				WebElement certificateEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[4]"));
+				WebElement certificateEle = loadResult.findElement(By.xpath("following-sibling::td[3]"));
 				if(!"*".equals(certificateEle.getText()))
 				{
 					nacao.setCertificateExists(1);
-					WebElement imageEle = certificateEle.findElement(By.xpath("/html/body/form/div/table/tbody/tr[2]/td/span/table/tbody/tr/td[4]/a/img"));
-					imageEle.click();
-					certificateIframe=waitForCertificateIframe();
-					String imageSrc = certificateIframe.getAttribute("src");
+					String imageSrc = certificateEle.findElement(By.xpath("a")).getAttribute("href");
 					
 					imageSrc=URLDecoder.decode(imageSrc,"utf8");
 					imageSrc=URLDecoder.decode(imageSrc,"utf8");
@@ -435,7 +443,7 @@ public class NacaoOrgSearcher extends Searcher{
 
 	public Boolean waitForYmWindow()
 	{
-		return (new WebDriverWait(driver,1,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<Boolean>() 
+		return (new WebDriverWait(driver,2,SysConfig.SLEEP_IN_MILLIS)).until(new ExpectedCondition<Boolean>() 
 		{
 			public Boolean apply(WebDriver d) 
         	{
@@ -506,20 +514,21 @@ public class NacaoOrgSearcher extends Searcher{
 		searcher.setLogger(new Logger("test"));
 		searcher.setFireFoxPath("C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe");
 		searcher.initDriver();
-		System.out.println(searcher.search("006622409"));
+//		System.out.println(searcher.search("802100433"));
 		System.out.println(System.currentTimeMillis());
 //		System.out.println(searcher.search("802100433"));
-//		String[] codeArray={"802100433","596247871","59502609X","808220081","67452250X","574064548","228560207",
-//    			"669084461","500011128","579539434","576652132"};
-//		for(String code:codeArray)
-//		{
-//			NACAO nacao=searcher.search(code);
+		String[] codeArray={"802100433","596247871","59502609X","808220081","67452250X","574064548","228560207",
+    			"669084461","500011128","579539434","576652132"};
+		for(String code:codeArray)
+		{
+			NACAO nacao=searcher.search(code);
+			System.out.println(nacao);
 //			String[] colsAndVals=nacao.getColsAndVals();
 //			colsAndVals[0]+=",lastUpdateTime";
 //			colsAndVals[1]+=",getDate()";
 //			String insertSql=String.format("insert into %s(%s) values(%s)","NacaoOrg",colsAndVals[0],colsAndVals[1]);
-////			logger.info(insertSql);
-////			dbClient.execute(insertSql);
-//		}
+//			logger.info(insertSql);
+//			dbClient.execute(insertSql);
+		}
 	}
 }

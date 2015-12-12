@@ -2,20 +2,21 @@ package tools;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public class MSSQLClient{
 
 	public Connection conn;
-	public int fetchSize=1;
+//	public int fetchSize=1;
 	public String driverName = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
 	
 	public String connectionURL;
 	public String user;
 	public String pwd;
 	public boolean autoCommit;
+	public Statement statement;
 	
 //	private static String connectionURL = "jdbc:sqlserver://172.16.0.129:1433; DatabaseName=BaiduBaike"; 
 
@@ -33,7 +34,10 @@ public class MSSQLClient{
 		Class.forName(driverName);
 		conn = DriverManager.getConnection(connectionURL, user, pwd);
 		conn.setAutoCommit(autoCommit);
+		statement=conn.createStatement();
 	}
+	
+	
 	
 	public ResultSet execute(String sql) throws SQLException, ClassNotFoundException
 	{
@@ -42,15 +46,21 @@ public class MSSQLClient{
 		{
 			buildConnection();
 		}
-		PreparedStatement ps = conn.prepareStatement(sql);
-        ps.setFetchSize(fetchSize);
-        ps.execute();
-        ResultSet res=ps.getResultSet();
+//		Statement statement=conn.createStatement();
+		statement.execute(sql);
+		ResultSet res=statement.getResultSet();
+		
+//		PreparedStatement ps = conn.prepareStatement(sql);
+//        ps.setFetchSize(fetchSize);
+//        ps.execute();
+//        ResultSet res=ps.getResultSet();
+//		statement.close();
         return res;
 	}
 	
 	public void close() throws SQLException
 	{
+		statement.close();
 		conn.close();
 	}
 	

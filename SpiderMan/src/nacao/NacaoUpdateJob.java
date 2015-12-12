@@ -22,7 +22,7 @@ public class NacaoUpdateJob {
 	public Searcher searcher;
 	public String dstTableName;
 	
-	public int batchSize=50;
+	public int batchSize=100;
 	public int startBaseCode=82400;
 	public String changeIP="null";
 	public Logger logger;
