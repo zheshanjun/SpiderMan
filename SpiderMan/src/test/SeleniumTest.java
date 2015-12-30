@@ -1,30 +1,19 @@
 package test;
 
-import java.io.File;
 import java.io.IOException;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
+import java.net.MalformedURLException;
 import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchWindowException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebDriver.TargetLocator;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.firefox.FirefoxDriver;
-import org.openqa.selenium.firefox.FirefoxProfile;
-import org.openqa.selenium.htmlunit.HtmlUnitDriver;
-import org.openqa.selenium.support.ui.ExpectedCondition;
-import org.openqa.selenium.support.ui.WebDriverWait;
+import com.gargoylesoftware.htmlunit.FailingHttpStatusCodeException;
+import tools.ExtendedHtmlUnitDriver;
 
 public class SeleniumTest {
 
-	public static void main(String[] args) throws InterruptedException
+	public static void main(String[] args) throws InterruptedException, FailingHttpStatusCodeException, MalformedURLException, IOException
 	{
-		WebDriver driver=new FirefoxDriver();
-		driver.get("www.baidu.com");
-		
-		driver=null;
-
+		ExtendedHtmlUnitDriver driver = new ExtendedHtmlUnitDriver(true);
+		driver.get("https://www.baidu.com/");
+		WebElement x = driver.findElement(By.xpath("//input[@id='su']"));
+		System.out.println(x);
 	}
 }

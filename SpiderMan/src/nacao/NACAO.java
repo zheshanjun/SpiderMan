@@ -1,9 +1,11 @@
 package nacao;
 
 import java.io.IOException;
-public class NACAO {
 
-	public String orgCode; //组织机构代码
+import tools.DataModel;
+public class NACAO extends DataModel{
+
+	public String code; //组织机构代码
 	public String orgName=null; //机构名称
 	public String orgType=null; //机构类型
 	public String validPeriod=null; //有效期
@@ -26,11 +28,17 @@ public class NACAO {
 	 * 3.8：预留（百度应用）
 	 * 3.9：预留（百度应用）
 	 */
-	public NACAO(String code,float updateStatus)
+	
+	public NACAO(String code)
 	{
-		this.orgCode=code;
-		this.updateStatus=updateStatus;
+		super(code);
 	}
+	
+//	public NACAO(String code,float updateStatus)
+//	{
+//		this.code=code;
+//		this.updateStatus=updateStatus;
+//	}
 	
 	public void setUpdateStatus(float updateStatus)
 	{
@@ -71,21 +79,47 @@ public class NACAO {
 	}
 	public String toString()
 	{
-		return "orgCode:"+orgCode
-				+",orgName:"+orgName
-				+",orgType:"+orgType
-				+",validPeriod:"+validPeriod
-				+",issuingAuthority:"+issuingAuthority
-				+",registeredCode:"+registeredCode
-				+",registeredAddress:"+registeredAddress
-				+",updateStatus:"+updateStatus
-				+",certificateExists:"+certificateExists;
+		StringBuilder res=new StringBuilder("orgCode='"+code+"',");
+		if(orgName!=null)
+		{
+			res.append("orgName='"+orgName+"',");
+		}
+		if(orgType!=null)
+		{
+			res.append("orgType='"+orgType+"',");
+		}
+		if(validPeriod!=null)
+		{
+			res.append("validPeriod='"+validPeriod+"',");
+		}
+		if(issuingAuthority!=null)
+		{
+			res.append("issuingAuthority='"+issuingAuthority+"',");
+		}
+		if(registeredCode!=null)
+		{
+			res.append("registeredCode='"+registeredCode+"',");
+		}
+		if(registeredAddress!=null)
+		{
+			res.append("registeredAddress='"+registeredAddress+"',");
+		}
+		if(certificateExists!=-1)
+		{
+			res.append("certificateExists="+certificateExists+",");
+		}
+		if(reservea!=null)
+		{
+			res.append("reservea='"+reservea+"',");
+		}
+		res.append("updateStatus='"+updateStatus+"'");
+		return res.toString();
 	}
 	
 	public String[] getColsAndVals()
 	{
 		StringBuilder cols=new StringBuilder("orgCode,");
-		StringBuilder vals=new StringBuilder("'"+orgCode+"',");
+		StringBuilder vals=new StringBuilder("'"+code+"',");
 		
 		if(orgName!=null)
 		{
@@ -168,7 +202,6 @@ public class NACAO {
 //		
 //		String vals=colsAndVals[1]+",getDate()";
 //		String insertSql=String.format("insert into %s(%s) values(%s)","BaiduApp",cols,vals);
-		System.out.println(generateCode(830901));
-		
+		System.out.println(generateCode(66000000));
 	}
 }

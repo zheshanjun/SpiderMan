@@ -19,7 +19,7 @@ public class NacaoUpdateJob {
 	
 	public String today;
 	public String host; //当前任务的IP
-	public Searcher searcher;
+	public NacaoOrgSearcher searcher;
 	public String dstTableName;
 	
 	public int batchSize=100;
@@ -44,16 +44,7 @@ public class NacaoUpdateJob {
 
 	public void initSearcher(String fireFoxPath) throws Exception
 	{
-		if("BaiduApp".equals(dstTableName))
-		{
-			searcher=new BaiduAppSearcher();
-//			searcher.addProxyFactory();
-		}
-		else if("NacaoOrg".equals(dstTableName))
-		{
-			logger.info("dstTableName:"+dstTableName);
-			searcher=new NacaoOrgSearcher();
-		}
+		searcher=new NacaoOrgSearcher();
 		searcher.setLogger(logger);
 		if(!fireFoxPath.equals("default"))
 		{

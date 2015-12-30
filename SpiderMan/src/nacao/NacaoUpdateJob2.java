@@ -1,5 +1,6 @@
 package nacao;
 
+import java.sql.BatchUpdateException;
 import java.sql.ResultSet;
 import java.util.Date;
 
@@ -17,7 +18,7 @@ public class NacaoUpdateJob2 {
 	public int totalUpdateBatchCnt=0;
 	
 	public String host; //当前任务的IP
-	public Searcher searcher;
+	public NacaoOrgSearcher searcher;
 	
 	public int batchSize=80;
 	public int startBaseCode;
@@ -74,7 +75,6 @@ public class NacaoUpdateJob2 {
 	
 	public void run() throws Exception
 	{
-		
 		while(startBaseCode<69725481)
 		{
 			//10分钟没有更新过的进程，认为进程已死亡,接管该进程任务
@@ -235,7 +235,6 @@ public class NacaoUpdateJob2 {
 				dbClient.statement.addBatch(sql4);
 				dbClient.statement.executeBatch();
 				dbClient.commit();
-				dbClient.commit();
 				System.exit(1);
 			}
 		}
@@ -247,7 +246,14 @@ public class NacaoUpdateJob2 {
 				+ "where processID='%s'",stopBaseCode,lastUpdateStatus,totalUpdateCnt,processID);
 		dbClient.statement.addBatch(sql4);
 		dbClient.statement.executeBatch();
-		dbClient.commit();
+		try
+		{
+			dbClient.commit();
+		}
+		catch (BatchUpdateException e)
+		{
+			System.out.println(e.getSQLState());
+		}
 
 		return lastUpdateStatus;
 	}
@@ -281,7 +287,7 @@ public class NacaoUpdateJob2 {
 		codeTable="NacaoOrg2";
 		processTable="ProcessStatus2";
 		NacaoUpdateJob2 job = new NacaoUpdateJob2("localhost");
-		job.startBaseCode=57000000;
+//		job.startBaseCode=57000000;
 		job.initSearcher("default");
 		job.run();
 	}

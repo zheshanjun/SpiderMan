@@ -126,7 +126,7 @@ public class NacaoOrgSearcher extends Searcher{
 	public NACAO search(String orgCode) throws Exception
 	{
 		curOrgCode=orgCode;
-		NACAO nacao= new NACAO(curOrgCode,0);
+		NACAO nacao= new NACAO(curOrgCode);
 		try
 		{
 			//提交查询请求
@@ -198,6 +198,7 @@ public class NacaoOrgSearcher extends Searcher{
 			}
 			else
 			{
+				nacao.setUpdateStatus(0);
 				nacao.setCertificateExists(0);
 				//机构名称
 //				WebElement nameEle = driver.findElement(By.xpath(".//*[@id='biaodan']/table/tbody/tr/td[2]"));
@@ -475,7 +476,7 @@ public class NacaoOrgSearcher extends Searcher{
 	        for (String s : handles) {  
 	            if (s.equals(searchWindowHandle))  
 	                continue;  
-	            else {  
+	            else {
 	                driver.switchTo().window(s);  
 	                flag = true;
                     break;    

@@ -13,7 +13,7 @@ public class UpdateFailed {
 
 	public String dstTableName;
 	public MSSQLClient dbClient;
-	public Searcher searcher;
+	public NacaoOrgSearcher searcher;
 	public Logger logger;
 	public String host="localhost";
 	public UpdateFailed() throws ClassNotFoundException, SQLException, IOException
@@ -29,17 +29,7 @@ public class UpdateFailed {
 	
 	public void initSearcher() throws Exception
 	{
-		if("BaiduApp".equals(dstTableName))
-		{
-			searcher=new BaiduAppSearcher();
-//			searcher.addProxyFactory();
-		}
-		else if("NacaoOrg".equals(dstTableName))
-		{
-			searcher=new NacaoOrgSearcher();
-//			searcher.addProxyFactory();
-		}
-		
+		searcher=new NacaoOrgSearcher();
 		searcher.setLogger(logger);
 		searcher.initDriver();
 	}

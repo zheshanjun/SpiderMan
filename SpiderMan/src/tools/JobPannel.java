@@ -1,9 +1,11 @@
 package tools;
 
+import gs.LnGsUpdateJob;
 import nacao.BaiduAppSearcher;
 import nacao.NacaoUpdateJob;
 import nacao.NacaoUpdateJob2;
-import test.Test;
+import nacao.NacaoUpdateJob3;
+
 
 
 public class JobPannel {
@@ -19,6 +21,14 @@ public class JobPannel {
 		if(jobConf.jobName.equals("NacaoUpdateJob"))
 		{
 			NacaoUpdateJob2.run(jobConf);
+		}
+		else if(jobConf.jobName.equals("NacaoUpdateJob3"))
+		{
+			NacaoUpdateJob3.run(jobConf);
+		}
+		else if(jobConf.jobName.equals("LnGsUpdateJob"))
+		{
+			LnGsUpdateJob.run(jobConf);
 		}
 		else if(jobConf.jobName.equals("ConnectNetWork"))
 		{

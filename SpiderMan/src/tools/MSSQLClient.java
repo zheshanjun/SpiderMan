@@ -42,19 +42,13 @@ public class MSSQLClient{
 	public ResultSet execute(String sql) throws SQLException, ClassNotFoundException
 	{
 //		System.out.println("->\n"+sql);
+//		return null;
 		if(conn.isClosed())
 		{
 			buildConnection();
 		}
-//		Statement statement=conn.createStatement();
 		statement.execute(sql);
 		ResultSet res=statement.getResultSet();
-		
-//		PreparedStatement ps = conn.prepareStatement(sql);
-//        ps.setFetchSize(fetchSize);
-//        ps.execute();
-//        ResultSet res=ps.getResultSet();
-//		statement.close();
         return res;
 	}
 	

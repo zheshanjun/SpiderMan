@@ -14,7 +14,7 @@ public class Logger {
 	public void info(String s) throws IOException
 	{
 		String infoStr=df.format(new Date())+s+"\n";
-//		System.out.print(infoStr);
+		System.out.print(infoStr);
 		fw.write(infoStr);
 		flush();
 	}
